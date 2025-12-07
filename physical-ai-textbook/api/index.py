@@ -105,8 +105,8 @@ def refresh_model_selection(force: bool = False) -> Tuple[str, Optional[str]]:
 # Don't call at startup - can hang on slow connections
 # Will be called on first request
 
-# Define App with explicit root path for Vercel
-app = FastAPI(root_path="/api")
+# FastAPI app for Vercel (no root_path needed, Vercel handles /api routing)
+app = FastAPI()
 
 # ALLOW ALL ORIGINS (Fixes CORS Error)
 app.add_middleware(
@@ -116,6 +116,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "Physical AI Chatbot API", "version": "1.0"}
 
 @app.get("/health")
 async def health_check():
