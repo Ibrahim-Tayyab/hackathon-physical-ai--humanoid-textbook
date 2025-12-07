@@ -8,7 +8,7 @@ qdrant-client==1.12.1
 
 # Embeddings & LLM
 cohere==5.14.0
-openai==1.57.4
+openai>=1.58.1
 
 # Environment Management
 python-dotenv==1.0.1
