@@ -573,8 +573,9 @@ async def search_textbook(query: str, top_k: int = 5):
         raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
 
 
-# Vercel serverless handler
-handler = app
+# Vercel serverless handler using Mangum
+from mangum import Mangum
+handler = Mangum(app)
 
 if __name__ == "__main__":
     import uvicorn
