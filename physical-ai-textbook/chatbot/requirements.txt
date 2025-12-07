@@ -1,40 +1,42 @@
 # Core Web Framework
-fastapi==0.115.5
-uvicorn[standard]==0.32.1
-python-multipart==0.0.20
+fastapi
+uvicorn
+python-multipart
 
 # Vector Database
-qdrant-client==1.12.1
+qdrant-client
 
 # Embeddings & LLM
-cohere>=5.18.0
-openai>=1.58.1
+cohere
+openai
+google-generativeai
 
 # Environment Management
-python-dotenv==1.0.1
+python-dotenv
 
 # Data Processing
-langchain==0.3.13
-langchain-community==0.3.13
-langchain-openai==0.2.14
-langchain-cohere==0.5.0
+langchain
+langchain-community
+langchain-openai
+langchain-cohere
 
 # Text Processing & Chunking
-tiktoken==0.8.0
-markdown==3.7
+tiktoken
+markdown
 
 # HTTP & Async
-httpx==0.28.1
-aiofiles==24.1.0
+httpx
+aiofiles
+requests
 
 # Utilities
-pydantic==2.10.4
-pydantic-settings==2.7.0
-typing-extensions==4.12.2
+pydantic
+pydantic-settings
+typing-extensions
 
 # Optional: Progress & Logging
-tqdm==4.67.1
-loguru==0.7.3
+tqdm
+loguru
 
 # Optional: RAG Frameworks (if needed)
-llama-index==0.12.9
+llama-index
