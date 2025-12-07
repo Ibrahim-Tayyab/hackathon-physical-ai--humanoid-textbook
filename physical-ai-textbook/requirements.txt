@@ -1,8 +1,9 @@
 fastapi
 uvicorn
 python-multipart
-requests
 qdrant-client
 cohere
 google-generativeai
 python-dotenv
+requests
+pydantic
