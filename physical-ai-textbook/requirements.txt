@@ -1,9 +1,10 @@
+# MINIMAL BUILD - Under 250MB for Vercel
 fastapi
 uvicorn
-python-multipart
 qdrant-client
 cohere
 google-generativeai
 python-dotenv
-requests
+openai
 pydantic
+httpx
