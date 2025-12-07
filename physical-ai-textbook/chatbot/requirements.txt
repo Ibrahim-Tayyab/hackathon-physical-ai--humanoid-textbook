@@ -1,42 +1,7 @@
-# Core Web Framework
+# MINIMAL BUILD - Under 250MB for Vercel
 fastapi
 uvicorn
-python-multipart
-
-# Vector Database
 qdrant-client
-
-# Embeddings & LLM
 cohere
-openai
 google-generativeai
-
-# Environment Management
 python-dotenv
-
-# Data Processing
-langchain
-langchain-community
-langchain-openai
-langchain-cohere
-
-# Text Processing & Chunking
-tiktoken
-markdown
-
-# HTTP & Async
-httpx
-aiofiles
-requests
-
-# Utilities
-pydantic
-pydantic-settings
-typing-extensions
-
-# Optional: Progress & Logging
-tqdm
-loguru
-
-# Optional: RAG Frameworks (if needed)
-llama-index
