@@ -13,7 +13,7 @@ import cohere
 import httpx
 import openai
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 from pydantic import BaseModel
@@ -104,17 +104,21 @@ def refresh_model_selection(force: bool = False) -> Tuple[str, Optional[str]]:
 
 refresh_model_selection()
 
-# FastAPI app
-app = FastAPI(title="Physical AI Textbook Chatbot API")
+# Define App with explicit root path for Vercel
+app = FastAPI(root_path="/api")
 
-# CORS middleware
+# ALLOW ALL ORIGINS (Fixes CORS Error)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=["*"],  # Allows all domains
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "message": "Backend is active!"}
 
 
 # Pydantic models
