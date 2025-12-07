@@ -102,7 +102,8 @@ def refresh_model_selection(force: bool = False) -> Tuple[str, Optional[str]]:
     return ACTIVE_MODEL, MODEL_NOTICE
 
 
-refresh_model_selection()
+# Don't call at startup - can hang on slow connections
+# Will be called on first request
 
 # Define App with explicit root path for Vercel
 app = FastAPI(root_path="/api")
