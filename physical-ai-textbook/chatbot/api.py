@@ -568,6 +568,9 @@ async def search_textbook(query: str, top_k: int = 5):
         raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
 
 
+# Vercel serverless handler
+handler = app
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
