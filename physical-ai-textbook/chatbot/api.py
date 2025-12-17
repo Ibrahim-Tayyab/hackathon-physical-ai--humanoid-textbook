@@ -13,7 +13,7 @@ import cohere
 import httpx
 import openai
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 from pydantic import BaseModel
@@ -102,19 +102,24 @@ def refresh_model_selection(force: bool = False) -> Tuple[str, Optional[str]]:
     return ACTIVE_MODEL, MODEL_NOTICE
 
 
-refresh_model_selection()
+# Don't call refresh_model_selection() at startup - it can hang
+# It will be called on first request instead
 
-# FastAPI app
-app = FastAPI(title="Physical AI Textbook Chatbot API")
+# Define App with explicit root path for Vercel
+app = FastAPI(root_path="/api")
 
-# CORS middleware
+# ALLOW ALL ORIGINS (Fixes CORS Error)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "https://kajo-theta.vercel.app", "https://hackathon-physical-ai-humanoid-text-kappa.vercel.app"],
+    allow_origins=["*"],  # Allows all domains
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "message": "Backend is active!"}
 
 
 # Pydantic models
@@ -563,6 +568,9 @@ async def search_textbook(query: str, top_k: int = 5):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
 
+
+# Vercel serverless handler
+handler = app
 
 if __name__ == "__main__":
     import uvicorn
