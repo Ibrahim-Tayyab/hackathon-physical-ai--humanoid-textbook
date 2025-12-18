@@ -92,7 +92,7 @@ export default function ChatAssistant() {
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, messages.length > 0 ? messages[messages.length - 1].content.length : 0]);
+    }, [messages.length, isOpen]);
 
     useEffect(() => {
         if (isOpen && inputRef.current) {
@@ -322,8 +322,12 @@ export default function ChatAssistant() {
                                             </div>
 
                                             {/* Sources */}
-                                            {msg.sources && msg.sources.length > 0 && (
-                                                <div className={styles.sources}>
+                                            {msg.sources && msg.sources.length > 0 && !msg.animate && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, height: 0 }}
+                                                    animate={{ opacity: 1, height: 'auto' }}
+                                                    className={styles.sources}
+                                                >
                                                     <div className={styles.sourcesTitle}>
                                                         <FaBook size={10} /> Sources
                                                     </div>
@@ -333,7 +337,7 @@ export default function ChatAssistant() {
                                                             <div className={styles.sourceModule}>{source.module}</div>
                                                         </div>
                                                     ))}
-                                                </div>
+                                                </motion.div>
                                             )}
                                         </div>
                                     </motion.div>
