@@ -1,0 +1,16 @@
+# Docusaurus build output
+build/
+.docusaurus/
+node_modules/
+.env
+.env.local
+.DS_Store
+
+# Python virtual env
+.venv/
+venv/
+__pycache__/
+
+# Heavy logic not needed for runtime API
+docs/
+static/
