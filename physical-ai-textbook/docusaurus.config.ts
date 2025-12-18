@@ -27,6 +27,21 @@ const config: Config = {
 
   onBrokenLinks: 'warn',
 
+  i18n: {
+    defaultLocale: 'en',
+    locales: ['en', 'ur'],
+    localeConfigs: {
+      en: {
+        label: 'English',
+        direction: 'ltr',
+      },
+      ur: {
+        label: 'اردو',
+        direction: 'rtl',
+      },
+    },
+  },
+
   presets: [
     [
       'classic',
@@ -67,6 +82,21 @@ const config: Config = {
       defaultMode: 'dark',
       disableSwitch: false,
       respectPrefersColorScheme: true,
+    },
+    // i18n Configuration
+    i18n: {
+      defaultLocale: 'en',
+      locales: ['en', 'ur'],
+      localeConfigs: {
+        en: {
+          label: 'English',
+          direction: 'ltr',
+        },
+        ur: {
+          label: 'اردو',
+          direction: 'rtl',
+        },
+      },
     },
     navbar: {
       title: 'Physical AI',

@@ -185,34 +185,55 @@ export default function ChatAssistant() {
     };
 
     // Text Selection Logic
-    const [selection, setSelection] = useState<{ x: number; y: number; text: string } | null>(null);
+    const [selection, setSelection] = useState<{ x: number; y: number; text: string; position: 'above' | 'below' } | null>(null);
 
     useEffect(() => {
         if (!isBrowser) return;
 
-        const handleSelection = () => {
-            const selectedText = window.getSelection()?.toString().trim();
-            if (selectedText && selectedText.length > 0) {
-                const range = window.getSelection()?.getRangeAt(0);
-                if (range) {
-                    const rect = range.getBoundingClientRect();
-                    setSelection({
-                        x: rect.left + rect.width / 2,
-                        y: rect.top,
-                        text: selectedText
-                    });
+        let timeoutId: NodeJS.Timeout;
+
+        const handleSelectionChange = () => {
+            clearTimeout(timeoutId);
+            // Debounce to avoid rapid firing during drag
+            timeoutId = setTimeout(() => {
+                const selectionObj = window.getSelection();
+                const selectedText = selectionObj?.toString().trim();
+
+                if (selectedText && selectedText.length > 0) {
+                    const range = selectionObj?.getRangeAt(0);
+                    if (range) {
+                        const rect = range.getBoundingClientRect();
+
+                        // Check if selection is too close to top of viewport
+                        const isNearTop = rect.top < 80;
+
+                        setSelection({
+                            x: rect.left + rect.width / 2,
+                            // If near top, place below (rect.bottom), otherwise above (rect.top)
+                            y: isNearTop ? rect.bottom : rect.top,
+                            text: selectedText,
+                            position: isNearTop ? 'below' : 'above'
+                        });
+                    }
+                } else {
+                    setSelection(null);
                 }
-            } else {
-                setSelection(null);
-            }
+            }, 600); // 600ms wait after selection stops
         };
 
-        document.addEventListener('mouseup', handleSelection);
-        document.addEventListener('keyup', handleSelection); // Handle keyboard selection too
+        // 'selectionchange' works on both Desktop (mouse) and Mobile (long press/handles)
+        document.addEventListener('selectionchange', handleSelectionChange);
+
+        // Add touchend as a fallback trigger for cleaner mobile interaction
+        document.addEventListener('touchend', handleSelectionChange);
+
+        document.addEventListener('keyup', handleSelectionChange);
 
         return () => {
-            document.removeEventListener('mouseup', handleSelection);
-            document.removeEventListener('keyup', handleSelection);
+            document.removeEventListener('selectionchange', handleSelectionChange);
+            document.removeEventListener('touchend', handleSelectionChange);
+            document.removeEventListener('keyup', handleSelectionChange);
+            clearTimeout(timeoutId);
         };
     }, [isBrowser]);
 
@@ -464,6 +485,8 @@ export default function ChatAssistant() {
                             style={{
                                 top: selection.y,
                                 left: selection.x,
+                                marginTop: selection.position === 'below' ? '20px' : '-10px',
+                                transform: selection.position === 'below' ? 'translate(-50%, 0)' : 'translate(-50%, -100%)'
                             }}
                             className={styles.promptButton}
                             onClick={handleAskSelection}
