@@ -15,7 +15,6 @@ import openai
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from mangum import Mangum
 from openai import OpenAI
 from pydantic import BaseModel
 from qdrant_client import QdrantClient
@@ -571,7 +570,7 @@ async def search_textbook(query: str, top_k: int = 5):
 
 
 # Vercel serverless handler
-handler = Mangum(app)
+# handler = Mangum(app)
 
 if __name__ == "__main__":
     import uvicorn
