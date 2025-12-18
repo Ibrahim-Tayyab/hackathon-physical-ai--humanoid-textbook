@@ -3,11 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaRobot, FaTimes, FaPaperPlane, FaBook, FaBolt, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa';
 import useIsBrowser from '@docusaurus/useIsBrowser';
 import styles from './ChatAssistant.module.css';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface Message {
     role: 'user' | 'assistant';
     content: string;
     sources?: Source[];
+    animate?: boolean;
 }
 
 interface Source {
@@ -16,6 +19,34 @@ interface Source {
     file_path: string;
     score: number;
 }
+
+// Typing effect component
+const TypingMessage = ({ content, onComplete }: { content: string; onComplete?: () => void }) => {
+    const [displayedContent, setDisplayedContent] = useState('');
+    const [isComplete, setIsComplete] = useState(false);
+
+    useEffect(() => {
+        let currentIndex = 0;
+        const intervalId = setInterval(() => {
+            if (currentIndex <= content.length) {
+                setDisplayedContent(content.slice(0, currentIndex));
+                currentIndex++;
+            } else {
+                clearInterval(intervalId);
+                setIsComplete(true);
+                if (onComplete) onComplete();
+            }
+        }, 15); // Adjust typing speed here
+
+        return () => clearInterval(intervalId);
+    }, [content, onComplete]);
+
+    return (
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {displayedContent + (isComplete ? '' : '▍')}
+        </ReactMarkdown>
+    );
+};
 
 const getAPIUrl = () => {
     if (typeof window === 'undefined') return '/api';
@@ -40,6 +71,7 @@ export default function ChatAssistant() {
         {
             role: 'assistant',
             content: 'Hi! 👋 I\'m your AI tutor for Physical AI & Humanoid Robotics. Ask me anything about ROS 2, simulation, VLA models, or humanoid design.',
+            animate: false
         },
     ]);
     const [input, setInput] = useState('');
@@ -60,7 +92,7 @@ export default function ChatAssistant() {
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+    }, [messages, messages.length > 0 ? messages[messages.length - 1].content.length : 0]);
 
     useEffect(() => {
         if (isOpen && inputRef.current) {
@@ -121,6 +153,7 @@ export default function ChatAssistant() {
                 role: 'assistant',
                 content: data.response,
                 sources: data.sources,
+                animate: true,
             };
 
             setMessages((prev) => [...prev, assistantMessage]);
@@ -130,6 +163,7 @@ export default function ChatAssistant() {
                 {
                     role: 'assistant',
                     content: '❌ Unable to connect to backend. Start the server:\n\n```bash\ncd chatbot\npython api.py\n```',
+                    animate: true,
                 },
             ]);
         } finally {
@@ -142,6 +176,12 @@ export default function ChatAssistant() {
             e.preventDefault();
             sendMessage();
         }
+    };
+
+    const handleAnimationComplete = (index: number) => {
+        setMessages((prev) => prev.map((msg, i) =>
+            i === index ? { ...msg, animate: false } : msg
+        ));
     };
 
     if (!isBrowser) return null;
@@ -264,7 +304,22 @@ export default function ChatAssistant() {
                                         className={`${styles.messageRow} ${msg.role === 'user' ? styles.messageRowUser : styles.messageRowAssistant}`}
                                     >
                                         <div className={`${styles.messageContent} ${msg.role === 'user' ? styles.messageUser : styles.messageAssistant}`}>
-                                            <div className={styles.messageText}>{msg.content}</div>
+                                            <div className={styles.messageText}>
+                                                {msg.role === 'assistant' ? (
+                                                    msg.animate ? (
+                                                        <TypingMessage
+                                                            content={msg.content}
+                                                            onComplete={() => handleAnimationComplete(idx)}
+                                                        />
+                                                    ) : (
+                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                            {msg.content}
+                                                        </ReactMarkdown>
+                                                    )
+                                                ) : (
+                                                    msg.content
+                                                )}
+                                            </div>
 
                                             {/* Sources */}
                                             {msg.sources && msg.sources.length > 0 && (
