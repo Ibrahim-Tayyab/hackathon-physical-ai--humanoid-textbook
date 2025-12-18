@@ -129,9 +129,38 @@ html[data-theme='dark'] .navbar {
   border-bottom: 1px solid var(--border);
 }
 
+@keyframes footer-pulse-dark {
+  0% {
+    border-top-color: var(--border);
+  }
+
+  50% {
+    border-top-color: var(--primary);
+  }
+
+  100% {
+    border-top-color: var(--border);
+  }
+}
+
+@keyframes footer-pulse-dark {
+  0% {
+    border-top-color: var(--border);
+  }
+
+  50% {
+    border-top-color: var(--primary);
+  }
+
+  100% {
+    border-top-color: var(--border);
+  }
+}
+
 html[data-theme='dark'] .footer {
   background: var(--ifm-footer-background-color);
   border-top: 1px solid var(--border);
+  animation: footer-pulse-dark 4s infinite ease-in-out;
 }
 
 /* Light theme specific styles */
@@ -141,9 +170,24 @@ html[data-theme='light'] .navbar {
   box-shadow: var(--ifm-navbar-shadow);
 }
 
+@keyframes footer-pulse-light {
+  0% {
+    border-top-color: var(--border);
+  }
+
+  50% {
+    border-top-color: var(--primary-hover);
+  }
+
+  100% {
+    border-top-color: var(--border);
+  }
+}
+
 html[data-theme='light'] .footer {
   background: var(--ifm-footer-background-color);
   border-top: 1px solid var(--border);
+  animation: footer-pulse-light 4s infinite ease-in-out;
 }
 
 /* Card styles adapt to theme */

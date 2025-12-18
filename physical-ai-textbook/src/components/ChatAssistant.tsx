@@ -184,6 +184,48 @@ export default function ChatAssistant() {
         ));
     };
 
+    // Text Selection Logic
+    const [selection, setSelection] = useState<{ x: number; y: number; text: string } | null>(null);
+
+    useEffect(() => {
+        if (!isBrowser) return;
+
+        const handleSelection = () => {
+            const selectedText = window.getSelection()?.toString().trim();
+            if (selectedText && selectedText.length > 0) {
+                const range = window.getSelection()?.getRangeAt(0);
+                if (range) {
+                    const rect = range.getBoundingClientRect();
+                    setSelection({
+                        x: rect.left + rect.width / 2,
+                        y: rect.top,
+                        text: selectedText
+                    });
+                }
+            } else {
+                setSelection(null);
+            }
+        };
+
+        document.addEventListener('mouseup', handleSelection);
+        document.addEventListener('keyup', handleSelection); // Handle keyboard selection too
+
+        return () => {
+            document.removeEventListener('mouseup', handleSelection);
+            document.removeEventListener('keyup', handleSelection);
+        };
+    }, [isBrowser]);
+
+    const handleAskSelection = () => {
+        if (selection) {
+            setIsOpen(true);
+            setInput(selection.text);
+            setSelection(null);
+            window.getSelection()?.removeAllRanges(); // Clear selection
+            // Focus logic inside useEffect listening to isOpen will handle focus
+        }
+    };
+
     if (!isBrowser) return null;
 
     return (
@@ -410,6 +452,27 @@ export default function ChatAssistant() {
                     </>
                 )}
             </AnimatePresence>
+
+            {/* Selection Prompt Button */}
+            <AnimatePresence>
+                {
+                    selection && !isOpen && (
+                        <motion.button
+                            initial={{ opacity: 0, y: 10, x: '-50%' }}
+                            animate={{ opacity: 1, y: 0, x: '-50%' }}
+                            exit={{ opacity: 0, y: 5, x: '-50%' }}
+                            style={{
+                                top: selection.y,
+                                left: selection.x,
+                            }}
+                            className={styles.promptButton}
+                            onClick={handleAskSelection}
+                        >
+                            <FaRobot size={14} /> Ask Chatbot
+                        </motion.button>
+                    )
+                }
+            </AnimatePresence >
         </>
     );
 }

@@ -23,6 +23,44 @@
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* Prompt Button (Text Selection) */
+.promptButton {
+    position: fixed;
+    z-index: 10000;
+    padding: 8px 16px;
+    background: var(--primary);
+    color: white;
+    border-radius: 8px;
+    border: none;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transform: translate(-50%, -100%);
+    margin-top: -10px;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.promptButton:hover {
+    background: var(--primary-hover);
+    transform: translate(-50%, -100%) scale(1.05);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -90%);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, -100%);
+    }
+}
+
 /* Chat Window */
 .chatWindow {
     position: fixed;

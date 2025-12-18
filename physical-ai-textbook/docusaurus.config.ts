@@ -108,25 +108,29 @@ const config: Config = {
               to: '/docs/Introduction/vision',
             },
             {
-              label: 'Get Started',
-              to: '/docs/Introduction/vision',
+              label: 'Modules',
+              to: '/',
             },
           ],
         },
         {
-          title: 'Community',
+          title: 'Popular Models',
           items: [
             {
-              label: 'GitHub Discussions',
-              href: 'https://github.com/Ibrahim-Tayyab?tab=repositories',
+              label: 'ROS 2 Nodes',
+              to: '/docs/Module-1-ROS2/nodes-topics',
             },
             {
-              label: 'ROS 2 Community',
-              href: 'https://docs.ros.org/en/humble/',
+              label: 'Gazebo Sim',
+              to: '/docs/Module-2-Simulation/gazebo-physics',
             },
             {
-              label: 'NVIDIA Isaac',
-              href: 'https://developer.nvidia.com/isaac-sim',
+              label: 'VLA Brain',
+              to: '/docs/Module-4-VLA/voice-to-action',
+            },
+            {
+              label: 'RL Control',
+              to: '/docs/Module-6-Advanced-Control/reinforcement-learning',
             },
           ],
         },
@@ -134,21 +138,21 @@ const config: Config = {
           title: 'Socials',
           items: [
             {
+              label: 'YouTube Channel',
+              href: 'https://youtube.com/@itboyvlogs?si=DADXXNLqHje-fHY6',
+            },
+            {
+              label: 'GitHub',
+              href: 'https://github.com/Ibrahim-Tayyab',
+            },
+            {
               label: 'Blog',
               to: '/blog',
-            },
-            {
-              label: 'YouTube Channel',
-              href: 'https://youtube.com/@muhammadibrahim',
-            },
-            {
-              label: 'GitHub Projects',
-              href: 'https://github.com/Ibrahim-Tayyab?tab=repositories',
             },
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Muhammed Ibrahim - Physical AI & Humanoid Robotics. Built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} M Ibrahim Memon - Physical AI & Humanoid Robotics. Built by M Ibrahim Memon.`,
     },
     prism: {
       theme: prismThemes.vsDark,
