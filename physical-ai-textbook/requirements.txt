@@ -1,0 +1,11 @@
+# MINIMAL BUILD - Under 250MB for Vercel
+fastapi
+uvicorn
+qdrant-client
+cohere
+google-generativeai
+python-dotenv
+openai
+pydantic
+httpx
+mangum
