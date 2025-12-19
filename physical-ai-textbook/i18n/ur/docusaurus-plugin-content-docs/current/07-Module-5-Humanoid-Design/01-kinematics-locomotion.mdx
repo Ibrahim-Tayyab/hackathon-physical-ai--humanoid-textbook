@@ -1,0 +1,363 @@
+---
+sidebar_position: 1
+title: "ہیومنائیڈ کینی میٹکس کے بنیادی اصول"
+description: "دو پیڈل لوکموشن، الٹا کینی میٹکس، اور توازن کنٹرول کو سمجھنا"
+keywords: [humanoid kinematics, bipedal walking, inverse kinematics, balance control]
+---
+
+# ہیومنائیڈ کینی میٹکس کے بنیادی اصول
+
+## تعارف (Introduction)
+
+ہیومنائیڈ روبوٹ روبوٹک انجینئرنگ کے عروج کی نمائندگی کرتے ہیں، جنہیں انسانی حرکت کی نقل کرنے کے لیے جدید ترین کنٹرول سسٹم کی ضرورت ہوتی ہے۔ یہ باب ہیومنائیڈ لوکموشن کی ریاضیاتی اور الگورتھمک بنیادوں کو تلاش کرتا ہے۔
+
+---
+
+## 1. حرکیاتی زنجیریں (Kinematic Chains)
+
+### **فارورڈ کینی میٹکس (Forward Kinematics)**
+دیئے گئے جوائنٹ اینگلز θ₁, θ₂, ..., θₙ، اینڈ ایفیکٹر (end-effector) کی پوزیشن اور اورینٹیشن کا حساب لگائیں۔
+
+**Denavit-Hartenberg (DH) پیرامیٹرز:**
+
+| جوائنٹ | θ | d | a | α |
+|-------|---|---|---|---|
+| 1 (کولہا) | θ₁ | 0 | 0 | 90° |
+| 2 (گھٹنا) | θ₂ | L₁ | 0 | 0° |
+| 3 (ٹخنہ) | θ₃ | L₂ | 0 | 0° |
+
+**تبدیلی میٹرکس (Transformation Matrix):**
+```
+T = T₁ × T₂ × T₃
+```
+
+### **انورس کینی میٹکس (Inverse Kinematics - IK)**
+مطلوبہ اینڈ ایفیکٹر پوز کو مدنظر رکھتے ہوئے، مشترکہ زاویوں (joint angles) کے لیے حل کریں۔
+
+**تجزیاتی IK (سادہ زنجیروں کے لیے):**
+```python
+import numpy as np
+
+def solve_ik_2dof(x_target, y_target, L1, L2):
+    """
+    Solve 2-DOF planar arm IK
+    """
+    # Distance to target
+    D = np.sqrt(x_target**2 + y_target**2)
+    
+    # Check reachability
+    if D > (L1 + L2) or D < abs(L1 - L2):
+        raise ValueError("Target unreachable")
+    
+    # Elbow-up solution
+    cos_theta2 = (D**2 - L1**2 - L2**2) / (2 * L1 * L2)
+    theta2 = np.arccos(cos_theta2)
+    
+    # Shoulder angle
+    k1 = L1 + L2 * np.cos(theta2)
+    k2 = L2 * np.sin(theta2)
+    theta1 = np.arctan2(y_target, x_target) - np.arctan2(k2, k1)
+    
+    return theta1, theta2
+```
+
+**عددی IK (جیکوبین پر مبنی):**
+```python
+def jacobian_ik(target_pose, current_angles, max_iter=100, tol=1e-3):
+    """
+    Iterative IK using Jacobian pseudo-inverse
+    """
+    q = current_angles.copy()
+    
+    for i in range(max_iter):
+        # Current end-effector pose
+        current_pose = forward_kinematics(q)
+        
+        # Error
+        error = target_pose - current_pose
+        if np.linalg.norm(error) < tol:
+            return q
+        
+        # Jacobian
+        J = compute_jacobian(q)
+        
+        # Update: Δq = J⁺ · error
+        delta_q = np.linalg.pinv(J) @ error
+        q += 0.1 * delta_q  # Learning rate
+    
+    return q
+```
+
+---
+
+## 2. دو پیڈل لوکوموشن (Bipedal Locomotion)
+
+### **2.1 زیرو مومنٹ پوائنٹ (ZMP)**
+
+ZMP زمین پر وہ نقطہ ہے جہاں کشش ثقل اور জড়تا سے خالص لمحہ صفر ہے۔ مستحکم چلنے کے لیے، ZMP کو **سپورٹ پولیزون** کے اندر رہنا چاہیے۔
+
+**ZMP مساوات:**
+```
+ZMP_x = (Σ m_i · (z̈_i + g) · x_i) / (Σ m_i · (z̈_i + g))
+```
+
+**Python نفاذ:**
+```python
+def calculate_zmp(masses, positions, accelerations, g=9.81):
+    """
+    Calculate Zero Moment Point
+    
+    Args:
+        masses: List of link masses [m1, m2, ...]
+        positions: List of (x, y, z) positions
+        accelerations: List of (ẍ, ÿ, z̈) accelerations
+        g: Gravity constant
+    """
+    numerator_x = 0
+    numerator_y = 0
+    denominator = 0
+    
+    for m, pos, acc in zip(masses, positions, accelerations):
+        force_z = m * (acc[2] + g)
+        numerator_x += force_z * pos[0]
+        numerator_y += force_z * pos[1]
+        denominator += force_z
+    
+    zmp_x = numerator_x / denominator
+    zmp_y = numerator_y / denominator
+    
+    return zmp_x, zmp_y
+```
+
+### **2.2 گیٹ پلاننگ (Gait Planning)**
+
+**واکنگ سائیکل کے مراحل:**
+1.  **ڈبل سپورٹ:** دونوں پاؤں زمین پر (سائیکل کا 10-20%)
+2.  **سنگل سپورٹ:** ایک پاؤں زمین پر (30-40%)
+3.  **سوئنگ فیز:** ہوا میں پاؤں (30-40%)
+
+**رفتار کی پیداوار (کیوبک اسپلائن):**
+```python
+from scipy.interpolate import CubicSpline
+
+def generate_foot_trajectory(start, end, height, num_points=50):
+    """
+    Generate smooth foot swing trajectory
+    """
+    # Waypoints: start → apex → end
+    x_waypoints = [start[0], (start[0] + end[0])/2, end[0]]
+    y_waypoints = [start[1], (start[1] + end[1])/2, end[1]]
+    z_waypoints = [0, height, 0]
+    
+    t = [0, 0.5, 1.0]
+    
+    cs_x = CubicSpline(t, x_waypoints)
+    cs_y = CubicSpline(t, y_waypoints)
+    cs_z = CubicSpline(t, z_waypoints)
+    
+    t_interp = np.linspace(0, 1, num_points)
+    
+    return np.array([cs_x(t_interp), cs_y(t_interp), cs_z(t_interp)]).T
+```
+
+---
+
+## 3. بیلنس کنٹرول (Balance Control)
+
+### **3.1 سینٹر آف ماس (CoM) ٹریکنگ**
+
+معاون کثیرالاضلاع (support polygon) کے اندر CoM کو برقرار رکھیں:
+
+```python
+def com_controller(com_current, com_target, zmp_current, support_polygon, kp=5.0):
+    """
+    Proportional controller for CoM
+    """
+    # Error
+    error = com_target - com_current
+    
+    # Check ZMP constraint
+    if not is_point_in_polygon(zmp_current, support_polygon):
+        # Emergency step adjustment
+        return adjust_foot_placement(zmp_current, support_polygon)
+    
+    # Control output (desired CoM acceleration)
+    accel = kp * error
+    
+    return accel
+```
+
+### **3.2 ٹخنوں اور کولہے کی حکمت عملی**
+
+**ٹخنوں کی حکمت عملی (چھوٹی رکاوٹوں کے لیے):**
+```python
+def ankle_torque(com_error, ankle_stiffness=200):
+    """
+    Generate corrective ankle torque
+    """
+    return -ankle_stiffness * com_error
+```
+
+**کولہے کی حکمت عملی (بڑی رکاوٹوں کے لیے):**
+```python
+def hip_bend(com_error, max_bend=0.3):
+    """
+    Bend hips to shift CoM
+    """
+    bend_angle = np.clip(com_error * 0.5, -max_bend, max_bend)
+    return bend_angle
+```
+
+---
+
+## 4. جیکوبین اور رفتار کنٹرول
+
+### **4.1 تفریق حرکیات (Differential Kinematics)**
+
+مشترکہ رفتار (joint velocities) کو اینڈ ایفیکٹر کی رفتار سے جوڑیں:
+
+```
+v = J(q) · q̇
+```
+
+**مثال (3-DOF بازو):**
+```python
+def compute_jacobian(q, L1, L2, L3):
+    """
+    Compute Jacobian for 3-DOF planar arm
+    """
+    theta1, theta2, theta3 = q
+    
+    J = np.array([
+        [-L1*np.sin(theta1) - L2*np.sin(theta1+theta2) - L3*np.sin(theta1+theta2+theta3),
+         -L2*np.sin(theta1+theta2) - L3*np.sin(theta1+theta2+theta3),
+         -L3*np.sin(theta1+theta2+theta3)],
+        
+        [L1*np.cos(theta1) + L2*np.cos(theta1+theta2) + L3*np.cos(theta1+theta2+theta3),
+         L2*np.cos(theta1+theta2) + L3*np.cos(theta1+theta2+theta3),
+         L3*np.cos(theta1+theta2+theta3)]
+    ])
+    
+    return J
+```
+
+### **4.2 انفرادیت (Singularity) سے پرہیز**
+
+حرکیاتی انفرادیت کا پتہ لگائیں اور ان سے بچیں:
+
+```python
+def detect_singularity(J, threshold=1e-3):
+    """
+    Check if Jacobian is near-singular
+    """
+    det = np.linalg.det(J @ J.T)
+    return abs(det) < threshold
+
+def damped_pseudo_inverse(J, lambda_=0.01):
+    """
+    Damped Least Squares (DLS) inverse
+    """
+    return J.T @ np.linalg.inv(J @ J.T + lambda_**2 * np.eye(J.shape[0]))
+```
+
+---
+
+## 5. ROS 2 کے ساتھ عملی نفاذ
+
+### **5.1 IK سروس نوڈ**
+
+```python
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import Pose
+from sensor_msgs.msg import JointState
+
+class HumanoidIKService(Node):
+    def __init__(self):
+        super().__init__('ik_service')
+        self.subscription = self.create_subscription(
+            Pose,
+            '/target_pose',
+            self.pose_callback,
+            10
+        )
+        self.joint_pub = self.create_publisher(JointState, '/joint_commands', 10)
+    
+    def pose_callback(self, msg):
+        # Extract target position
+        x = msg.position.x
+        y = msg.position.y
+        z = msg.position.z
+        
+        # Solve IK
+        joint_angles = self.solve_ik([x, y, z])
+        
+        # Publish
+        joint_msg = JointState()
+        joint_msg.position = joint_angles
+        self.joint_pub.publish(joint_msg)
+    
+    def solve_ik(self, target):
+        # Your IK solver here
+        pass
+
+def main():
+    rclpy.init()
+    node = HumanoidIKService()
+    rclpy.spin(node)
+```
+
+---
+
+## 6. کیس اسٹڈی: واکنگ گیٹ (Walking Gait)
+
+**مقصد:** ہیومنائڈ کے لیے ایک مستحکم چلنے کی چال بنائیں۔
+
+**مراحل:**
+1.  سپورٹ پولین کے اندر ZMP کی رفتار کا منصوبہ بنائیں
+2.  حرکیات کا استعمال کرتے ہوئے ZMP سے CoM رفتار کا حساب لگائیں۔
+3.  مشترکہ رفتار کے لیے پورے جسمانی IK کو حل کریں۔
+4.  ٹارک کنٹرول کے ساتھ عمل کریں۔
+
+**کوڈ کنکال (Code Skeleton):**
+```python
+def plan_walking_gait(step_length, step_height, num_steps):
+    """
+    High-level walking planner
+    """
+    trajectories = []
+    
+    for i in range(num_steps):
+        # Swing foot trajectory
+        foot_traj = generate_foot_trajectory(
+            start=[i*step_length, 0, 0],
+            end=[(i+1)*step_length, 0, 0],
+            height=step_height
+        )
+        
+        # ZMP trajectory (stays within support polygon)
+        zmp_traj = plan_zmp_trajectory(foot_traj)
+        
+        # CoM trajectory
+        com_traj = zmp_to_com(zmp_traj)
+        
+        # IK for all timesteps
+        joint_traj = whole_body_ik(foot_traj, com_traj)
+        
+        trajectories.append(joint_traj)
+    
+    return trajectories
+```
+
+---
+
+## خلاصہ (Summary)
+
+اس باب میں شامل ہیں:
+*   ✅ فارورڈ اور انورس کینی میٹکس
+*   ✅ ZMP اور دو پیڈل استحکام
+*   ✅ گیٹ پلاننگ اور ٹریجیکٹری جنریشن
+*   ✅ بیلنس کنٹرول (ٹخنے/ہپ کی حکمت عملی)
+*   ✅ جیکوبین پر مبنی رفتار کنٹرول
+
+**اگلا:** ماڈیول 5.2 - ہاتھ اور گرفت کا کنٹرول

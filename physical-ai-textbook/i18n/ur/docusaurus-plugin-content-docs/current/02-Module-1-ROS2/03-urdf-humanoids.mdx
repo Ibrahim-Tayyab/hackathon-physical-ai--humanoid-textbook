@@ -1,0 +1,430 @@
+---
+sidebar_position: 3
+title: "جسم کی ماڈلنگ (URDF)"
+description: "URDF کے ساتھ روبوٹ کے ڈھانچے کی تعریف - لنکس، جوڑ، اور کینیٹکس"
+---
+
+# جسم کی ماڈلنگ: ہیومنائیڈ روبوٹس کے لیے URDF (Modeling the Body: URDF for Humanoid Robots)
+
+## سافٹ ویئر سے ڈھانچے تک
+
+آپ نے سیکھا ہے کہ ROS 2 نوڈز کس طرح **سوچتے** ہیں (نوڈز) اور **بات چیت** کرتے ہیں (ٹوپکس)۔ لیکن ROS 2 روبوٹ کے **جسمانی جسم** کو کیسے سمجھتا ہے؟
+
+درج کریں **URDF (یونیفائیڈ روبوٹ ڈسکرپشن فارمیٹ)**: ایک XML پر مبنی زبان جو بیان کرتی ہے:
+*   **لنکس**: جسم کے سخت حصے (ہڈیاں)
+*   **جوڑ**: لنکس کے درمیان رابطے (پٹھے/قبضے)
+*   **سینسرز**: کیمرے، LIDAR، IMUs
+*   **تصادم جیومیٹری (Collision Geometry)**: فزکس سمولیشن کے لیے
+*   **بصری جیومیٹری (Visual Geometry)**: 3D تصور کے لیے
+
+:::tip حیاتیاتی مشابہت
+اگر نوڈز **اعصابی نظام** (دماغی سگنل) ہیں، تو URDF **کنکال کا نظام** (ہڈیاں اور جوڑ) ہے۔ URDF کے بغیر، ROS 2 حرکت کے احکامات بھیج سکتا ہے، لیکن یہ نہیں جانتا کہ یہ *کیا* حرکت کر رہا ہے یا وہ حصے *کیسے* جڑے ہوئے ہیں۔
+:::
+
+---
+
+## فزیکل AI کے لیے URDF کیوں اہم ہے
+
+URDF فائلیں تین اہم مقاصد کو پورا کرتی ہیں:
+
+### 1. **تصور (Visualization)** (RViz2)
+اپنے روبوٹ کو 3D میں دیکھیں، سینسر ڈیٹا کا تصور کریں، اور ہارڈ ویئر کے بغیر ڈیبگ کریں۔
+
+### 2. **سمولیشن (Simulation)** (Gazebo, Isaac Sim)
+فزکس انجنوں کو جاننے کی ضرورت ہے:
+*   ہر لنک کا ماس اور جڑتا (inertia)
+*   مشترکہ حدود (کہنی کتنی دور جھک سکتی ہے)
+*   تصادم کی شکلیں (خود ٹکراؤ کو روکنے کے لیے)
+
+### 3. **موشن پلاننگ (Motion Planning)** (MoveIt2)
+الٹا حرکیات حل کرنے والوں (Inverse kinematics solvers) کو حرکیاتی سلسلہ (kinematic chain) کی ضرورت ہوتی ہے:
+*   "اس XYZ پوزیشن تک پہنچنے کے لیے، کون سے جوڑوں کو کتنے ڈگری تک گھومنا چاہیے؟"
+
+:::info حقیقی دنیا کی مثال
+Boston Dynamics کے Atlas ہیومنائیڈ کے **28 جوڑ** (کندھے، کہنیاں، کولہے، گھٹنے، ٹخنے) ہیں۔ اس کی URDF فائل ہر جوڑ کے گردش کے محور، حدود، اور ماس کی وضاحت کرتی ہے — جس سے نقلی انجنوں کو یہ پیش گوئی کرنے کی اجازت ملتی ہے کہ آیا چھلانگ لگانے کی حرکت **پہلے** کامیاب ہوگی یا نہیں، $2M کے روبوٹ کو خطرے میں ڈالنے سے پہلے۔
+:::
+
+---
+
+## URDF کی بنیادی باتیں: لنکس اور جوڑ
+
+### لنک کیا ہے؟ (What is a Link?)
+
+ایک **لینک** ایک **سخت جسمانی حصے** کی نمائندگی کرتا ہے:
+*   ہیومنائیڈ کے لیے: دھڑ، اوپری بازو، بازو، ران، پنڈلی
+*   پہیے والے روبوٹ کے لیے: چیسس، وہیل
+*   ڈرون کے لیے: فریم، پروپیلر
+
+ہر لنک میں ہے:
+*   **ماس** اور **انرشیا** (طبیعیات کے لیے)
+*   **بصری جیومیٹری** (3D میش یا قدیم شکل)
+*   **تصادم جیومیٹری** (تصادم کا پتہ لگانے کے لیے آسان شکل)
+
+### جوڑ کیا ہے؟ (What is a Joint?)
+
+ایک **جوڑ** دو لنکس کو جوڑتا ہے اور وضاحت کرتا ہے کہ وہ ایک دوسرے کے مقابلے میں **کیسے** حرکت کرتے ہیں:
+
+| مشترکہ قسم | تفصیل | مثال |
+| :--- | :--- | :--- |
+| **فکسڈ (Fixed)** | کوئی حرکت نہیں (ایک ساتھ ویلڈیڈ) | کمر سے دوبی تک |
+| **ریولوٹ (Revolute)** | محور کے گرد گھومتا ہے (1 DOF) | کہنی، گھٹنا |
+| **مسلسل (Continuous)** | 360° لامحدود گھومتا ہے | وہیل ایکسل |
+| **Prismatic** | محور کے ساتھ سلائڈ کرتا ہے (1 DOF) | دوربین، گریپر |
+
+:::note Degrees of Freedom (DOF)
+ایک انسان نما بازو میں عام طور پر **7 DOF** ہوتے ہیں: 3 کندھے کے جوڑ، 1 کہنی، 3 کلائی کے جوڑ۔ یہ انسانی بازو کی نقل و حرکت سے میل کھاتا ہے اور پیچیدہ ہیرا پھیری کے کاموں کو قابل بناتا ہے۔
+:::
+
+---
+
+## URDF XML ڈھانچہ
+
+یہاں ایک **سنگل لنک روبوٹ** کے لیے کم سے کم URDF فائل ہے:
+
+```xml
+<?xml version="1.0"?>
+<robot name="simple_bot">
+  
+  <!-- Base Link (chassis) -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="0.5 0.3 0.1"/>  <!-- 50cm x 30cm x 10cm باکس -->
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 0.8 1"/>  <!-- نیلا رنگ (RGBA) -->
+      </material>
+    </visual>
+    
+    <collision>
+      <geometry>
+        <box size="0.5 0.3 0.1"/>  <!-- سادگی کے لیے بصری جیسا ہی -->
+      </geometry>
+    </collision>
+    
+    <inertial>
+      <mass value="10.0"/>  <!-- 10 kg -->
+      <inertia ixx="0.1" ixy="0.0" ixz="0.0"
+               iyy="0.1" iyz="0.0"
+               izz="0.1"/>
+    </inertial>
+  </link>
+
+</robot>
+```
+
+**اہم اجزاء:**
+*   `<robot name="...">`: روٹ عنصر، روبوٹ کا نام دیتا ہے
+*   `<link name="...">`: ایک سخت جسم کی وضاحت کرتا ہے
+*   `<visual>`: جو آپ RViz میں دیکھتے ہیں (میش یا قدیم شکل)
+*   `<collision>`: طبیعیات کے لیے آسان شکل (اکثر کارکردگی کے لیے باکس/سلنڈر)
+*   `<inertial>`: ماس (کلوگرام) اور انرشیا ٹینسر (kg·m²)
+
+---
+
+## حقیقی مثال: روبوٹ ٹانگ (ہیومنائیڈ)
+
+آئیے ایک **سنگل ٹانگ** کو 3 جوڑوں کے ساتھ ماڈل کریں: کولہے، گھٹنے، ٹخنے۔
+
+```xml
+<?xml version="1.0"?>
+<robot name="humanoid_leg">
+  
+  <!-- 1. PELVIS (دنیا کے لیے فکسڈ) -->
+  <link name="pelvis">
+    <visual>
+      <geometry>
+        <box size="0.2 0.3 0.15"/>  <!-- 20cm x 30cm x 15cm -->
+      </geometry>
+      <material name="gray">
+        <color rgba="0.5 0.5 0.5 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.2 0.3 0.15"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="5.0"/>
+      <inertia ixx="0.05" ixy="0" ixz="0"
+               iyy="0.05" iyz="0"
+               izz="0.05"/>
+    </inertial>
+  </link>
+
+  <!-- 2. THIGH (اوپری ٹانگ) -->
+  <link name="thigh">
+    <visual>
+      <geometry>
+        <cylinder radius="0.05" length="0.4"/>  <!-- 5cm قطر, 40cm لمبا -->
+      </geometry>
+      <material name="black">
+        <color rgba="0.1 0.1 0.1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.05" length="0.4"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="3.0"/>
+      <inertia ixx="0.04" ixy="0" ixz="0"
+               iyy="0.04" iyz="0"
+               izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- 3. SHIN (نچلی ٹانگ) -->
+  <link name="shin">
+    <visual>
+      <geometry>
+        <cylinder radius="0.04" length="0.35"/>  <!-- 4cm قطر, 35cm لمبا -->
+      </geometry>
+      <material name="black">
+        <color rgba="0.1 0.1 0.1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.04" length="0.35"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="2.0"/>
+      <inertia ixx="0.02" ixy="0" ixz="0"
+               iyy="0.02" iyz="0"
+               izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- 4. FOOT -->
+  <link name="foot">
+    <visual>
+      <geometry>
+        <box size="0.12 0.06 0.04"/>  <!-- 12cm x 6cm x 4cm -->
+      </geometry>
+      <material name="gray">
+        <color rgba="0.3 0.3 0.3 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.12 0.06 0.04"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5"/>
+      <inertia ixx="0.001" ixy="0" ixz="0"
+               iyy="0.001" iyz="0"
+               izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- JOINT 1: Hip (Pelvis to Thigh) -->
+  <joint name="hip_joint" type="revolute">
+    <parent link="pelvis"/>
+    <child link="thigh"/>
+    <origin xyz="0 0 -0.075" rpy="0 0 0"/>  <!-- پوزیشن: pelvis مرکز سے 7.5cm نیچے -->
+    <axis xyz="0 1 0"/>  <!-- Y-axis کے گرد گھومتا ہے (آگے/پیچھے) -->
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="2.0"/>
+    <!-- حدود: -90° سے +90°، زیادہ سے زیادہ ٹارک 100 Nm، زیادہ سے زیادہ رفتار 2 rad/s -->
+  </joint>
+
+  <!-- JOINT 2: Knee (Thigh to Shin) -->
+  <joint name="knee_joint" type="revolute">
+    <parent link="thigh"/>
+    <child link="shin"/>
+    <origin xyz="0 0 -0.2" rpy="0 0 0"/>  <!-- thigh مرکز سے 20cm نیچے -->
+    <axis xyz="0 1 0"/>  <!-- Y-axis کے گرد گھومتا ہے -->
+    <limit lower="0" upper="2.36" effort="80" velocity="2.0"/>
+    <!-- حدود: 0° سے 135° (گھٹنا صرف ایک طرف جھکتا ہے)، زیادہ سے زیادہ ٹارک 80 Nm -->
+  </joint>
+
+  <!-- JOINT 3: Ankle (Shin to Foot) -->
+  <joint name="ankle_joint" type="revolute">
+    <parent link="shin"/>
+    <child link="foot"/>
+    <origin xyz="0 0 -0.175" rpy="0 0 0"/>  <!-- shin مرکز سے 17.5cm نیچے -->
+    <axis xyz="0 1 0"/>  <!-- Y-axis کے گرد گھومتا ہے -->
+    <limit lower="-0.79" upper="0.79" effort="50" velocity="2.0"/>
+    <!-- حدود: -45° سے +45°، زیادہ سے زیادہ ٹارک 50 Nm -->
+  </joint>
+
+</robot>
+```
+
+---
+
+## ٹانگ ماڈل کو توڑنا
+
+### لنک کی تعریفیں
+
+**ران (Thigh) لنک (Lines 28-50):**
+*   **جیومیٹری**: سلنڈر (انسانی ران کی شکل کا اندازہ لگاتا ہے)
+*   **طول و عرض**: 5cm رداس، 40cm لمبائی
+*   **ماس**: 3.0 kg (بالغ انسان کے لیے حقیقت پسندانہ)
+*   **انرشیا**: لمبائی محور کے ساتھ زیادہ (سلنڈر دائرے سے مختلف طریقے سے گھومتا ہے)
+
+### جوڑ کی تعریفیں
+
+**ہپ جوائنٹ (Lines 111-117):**
+```xml
+<joint name="hip_joint" type="revolute">
+  <parent link="pelvis"/>
+  <child link="thigh"/>
+  <origin xyz="0 0 -0.075" rpy="0 0 0"/>
+  <axis xyz="0 1 0"/>
+  <limit lower="-1.57" upper="1.57" effort="100" velocity="2.0"/>
+</joint>
+```
+
+**کلیدی خصوصیات:**
+*   `parent`/`child`: حرکیاتی سلسلہ (pelvis → thigh)
+*   `origin`: پوزیشن آفسیٹ (pelvis سنٹر سے 7.5cm نیچے)
+*   `axis`: گردش کا محور (Y-axis = pitch/آگے-پیچھے)
+*   `limit`:
+    *   `lower`/`upper`: -90° سے +90° (ریڈینز میں)
+    *   `effort`: زیادہ سے زیادہ ٹارک موٹر لاگو کر سکتی ہے (100 Nm)
+    *   `velocity`: زیادہ سے زیادہ گردشی رفتار (2 rad/s ≈ 115°/s)
+
+:::warning مشترکہ حدود
+درست حدود طے کرنا اہم ہے:
+*   **بہت وسیع**: روبوٹ ناممکن حرکتوں کی کوشش کرتا ہے اور نقلی عمل کو توڑتا ہے۔
+*   **بہت تنگ**: روبوٹ مطلوبہ کام انجام نہیں دے سکتا۔
+ہمیشہ حقیقی ہارڈویئر چشمی کا حوالہ دیں (مثال کے طور پر، Unitree G1 hip joint: ±120°)۔
+:::
+
+---
+
+## RViz میں URDF کا تصور کرنا
+
+ایک بار جب آپ کے پاس URDF فائل ہو، تو اسے دیکھیں:
+
+### مرحلہ 1: RViz کو URDF کے ساتھ لانچ کریں
+
+```bash
+# joint_state_publisher_gui انسٹال کریں (اگر پہلے سے انسٹال نہیں ہے)
+sudo apt install ros-humble-joint-state-publisher-gui
+
+# ویژولائزیشن لانچ کریں
+ros2 launch urdf_tutorial display.launch.py model:=./humanoid_leg.urdf
+```
+
+### مرحلہ 2: جوڑوں کے ساتھ بات چیت کریں
+
+ایک GUI ونڈو **ہر جوڑ کے لیے سلائیڈرز** کے ساتھ ظاہر ہوتی ہے:
+*   ہپ سلائیڈر کو منتقل کریں → ران گھومتی ہے۔
+*   گھٹنے کی سلائیڈر کو حرکت دیں → پنڈلی جھکتی ہے۔
+*   ٹخنے کی سلائیڈر کو حرکت دیں → پاؤں جھک جاتا ہے۔
+
+### مرحلہ 3: RViz میں دیکھیں
+
+RViz ریئل ٹائم میں ایڈجسٹ ہونے والی مشترکہ پوزیشنوں کے ساتھ 3D ماڈل دکھاتا ہے۔
+
+---
+
+## مکمل ہیومنائیڈز کے لیے URDF
+
+ایک مکمل ہیومنائیڈ URDF میں عام طور پر شامل ہوتا ہے:
+
+| جزو | لنکس | جوڑ | تفصیل |
+| :--- | :--- | :--- | :--- |
+| **دھڑ (Torso)** | 1-3 | 0-2 | سینہ، ریڑھ کی ہڈی (بعض اوقات بیان کیا جاتا ہے) |
+| **بازو (Arms)** | 6 (2×3) | 14 (2×7) | کندھا (3 DOF)، کہنی (1 DOF)، کلائی (3 DOF) |
+| **ٹانگیں (Legs)** | 6 (2×3) | 12 (2×6) | کولہا (3 DOF)، گھٹنا (1 DOF)، ٹخنہ (2 DOF) |
+| **ہاتھ (Hands)** | 30+ | 20+ | انگلیاں (اکثر فی انگلی 1 DOF تک آسان) |
+| **سر (Head)** | 1-2 | 2-3 | گردن پین/جھکاؤ، کیمرے |
+
+**ہیومنائیڈ کے لیے کل:**
+*   **~45 لنکس**
+*   **~50 جوڑ**
+*   **URDF فائل کا سائز**: 500-2000 لائنیں (سینسر کی تفصیل پر منحصر ہے)
+
+:::info مثال: Unitree G1 URDF
+Unitree G1 ہیومنائیڈ (2024 میں جاری کیا گیا) میں ایک [عوامی URDF فائل](https://github.com/unitreerobotics/unitree_ros) ہے جس کے ساتھ:
+*   23 متحرک جوڑ (سادہ ہاتھ)
+*   6 سینسرز (IMU, کیمرے, فورس ٹارک)
+*   خود ٹکراؤ سے بچنے کے لیے مکمل تصادم میش
+*   Gazebo اور Isaac Sim نقالی میں استعمال ہوتی ہے
+:::
+
+---
+
+## اعلی درجے کی: قدیم چیزوں کے بجائے میشز کا استعمال
+
+حقیقت پسندانہ بصری کے لیے، **3D میش فائلیں** استعمال کریں (.stl, .dae, .obj):
+
+```xml
+<visual>
+  <geometry>
+    <mesh filename="package://my_robot_description/meshes/thigh.stl" scale="0.001 0.001 0.001"/>
+    <!-- پیمانہ ملی میٹر (CAD فائلز) کو میٹر (ROS 2) میں تبدیل کرتا ہے۔ -->
+  </geometry>
+</visual>
+```
+
+**ورک فلو:**
+1.  **CAD ڈیزائن**: Fusion 360, SolidWorks, Blender میں روبوٹ ماڈل
+2.  **میش ایکسپورٹ کریں**: .stl (تصادم) یا .dae (بناوٹ کے ساتھ بصری) محفوظ کریں
+3.  **URDF میں حوالہ**: `<mesh filename="..."/>` استعمال کریں
+4.  **آپٹمائز کریں**: کارکردگی کے لیے تصادم میش کم پولی (< 1000 مثلث) ہونا چاہیے
+
+---
+
+## ہینڈ آن ورزش: ایک بازو شامل کریں
+
+**چیلنج:** شامل کرنے کے لیے `humanoid_leg.urdf` کو بڑھائیں **دائیں بازو** کے ساتھ:
+*   **اوپری بازو**: 30cm سلنڈر، 2kg
+*   **بازو**: 25cm سلنڈر، 1.5kg
+*   **کندھے کا جوڑ**: ریولوٹ، X-محور کے گرد گھومتا ہے، ±90°
+*   **کہنی کا جوڑ**: ریولوٹ، Y-محور کے گرد گھومتا ہے، 0° to 150°
+
+**سٹارٹر کوڈ:**
+```xml
+<!-- ٹانگوں کے لنکس/جوڑوں کے بعد <robot> ٹیگ میں شامل کریں۔ -->
+
+<link name="upper_arm">
+  <!-- آپ کا کوڈ یہاں -->
+</link>
+
+<joint name="shoulder_joint" type="revolute">
+  <parent link="pelvis"/>
+  <child link="upper_arm"/>
+  <!-- آپ کا کوڈ یہاں -->
+</joint>
+```
+
+**تصدیق:**
+```bash
+ros2 launch urdf_tutorial display.launch.py model:=./humanoid_leg_and_arm.urdf
+```
+آپ کو 5 مشترکہ سلائیڈرز دیکھنا چاہئے: کولہے، گھٹنا، ٹخنہ، کندھا، کہنی۔
+
+---
+
+## کلیدی ٹیکا ویز (Key Takeaways)
+
+✅ **URDF** روبوٹ کے ڈھانچے کی وضاحت کے لیے XML فارمیٹ ہے۔
+✅ **لنکس** جسم کے سخت حصے (ہڈیاں) ہیں
+✅ **جوڑ** لنکس کو جوڑتے ہیں اور حرکت کی رکاوٹوں کی وضاحت کرتے ہیں۔
+✅ **ریولوٹ جوڑ** ہیومنائیڈز (قلابے) کے لیے سب سے زیادہ عام ہیں۔
+✅ **RViz** URDF ماڈلز کو انٹرایکٹو طور پر تصور کرتا ہے۔
+✅ **درست ماس/انرشیا/حدود** تخروپن کی وفاداری کے لیے اہم ہیں۔
+
+---
+
+## اگلا کیا ہے؟
+
+آپ نے **روبوٹ کے جسم کی تعریف** میں مہارت حاصل کی ہے۔ اگلا ماڈیول **ماڈیول 2: NVIDIA Isaac Sim کے ساتھ سمولیشن** کا احاطہ کرتا ہے — جہاں آپ URDF ماڈلز کو photorealistic فزکس سمیلیٹر میں زندہ کریں گے اور لاکھوں متوازی تجربات کے ساتھ AI پالیسیوں کو تربیت دیں گے۔
+
+---
+
+## مزید پڑھنا
+
+*   [URDF Official Specification](http://wiki.ros.org/urdf/XML)
+*   [URDF Tutorials (ROS 2)](https://docs.ros.org/en/humble/Tutorials/Intermediate/URDF/URDF-Main.html)
+*   [Building a Visual Robot Model (RViz)](https://docs.ros.org/en/humble/Tutorials/Intermediate/URDF/Building-a-Visual-Robot-Model-with-URDF-from-Scratch.html)
+*   [Xacro: XML Macros for URDF](https://docs.ros.org/en/humble/Tutorials/Intermediate/URDF/Using-Xacro-to-Clean-Up-a-URDF-File.html) (تکرار کو کم کرنے کے لیے)
+*   [MuJoCo MJCF vs URDF](https://mujoco.readthedocs.io/en/latest/XMLreference.html) (DeepMind کے ذریعہ استعمال ہونے والا متبادل فارمیٹ)

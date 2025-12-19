@@ -1,0 +1,483 @@
+---
+sidebar_position: 2
+title: "Python ایجنٹس (rclpy)"
+description: "روبوٹ کو کنٹرول کرنے کے لیے پائتھون میں ROS 2 نوڈز لکھنا"
+---
+
+# Python ایجنٹس: rclpy کے ساتھ روبوٹس کو کنٹرول کرنا
+
+## روبوٹکس کے لیے Python کیوں؟
+
+اگرچہ روبوٹکس روایتی طور پر کارکردگی کے لیے C++ پر انحصار کرتا تھا، **Python فزیکل AI کا زبان فرینکا بن گیا ہے** تین اہم وجوہات کی بنا پر:
+
+1.  **AI/ML انٹیگریشن**: PyTorch, TensorFlow، اور HuggingFace ماڈلز Python-first ہیں۔
+2.  **ریپڈ پروٹو ٹائپنگ**: گھنٹوں میں نہیں بلکہ منٹوں میں خیالات کی جانچ کریں۔
+3.  **ایکو سسٹم**: NumPy, OpenCV, SciPy بھرپور سائنسی کمپیوٹنگ ٹولز فراہم کرتے ہیں۔
+
+**rclpy** (ROS کلائنٹ لائبریری برائے Python) Python کی ترقی میں آسانی اور ROS 2 کے ریئل ٹائم کمیونیکیشن کے بنیادی ڈھانچے کے درمیان فرق کو ختم کرتی ہے۔
+
+:::info کارکردگی نوٹ
+ادراک اور منصوبہ بندی کے لیے (جہاں AI ماڈلز چلتے ہیں)، Python بہترین ہے۔ انتہائی کم تاخیر والے موٹر کنٹرول لوپس (1kHz+) کے لیے، آپ C++ نوڈز استعمال کریں گے۔ زیادہ تر ہیومنائیڈ روبوٹ ایک ہی سسٹم میں **دونوں** زبانیں استعمال کرتے ہیں۔
+:::
+
+---
+
+## ROS 2 Python Node کی اناٹومی۔
+
+ہر ROS 2 Python نوڈ اس ڈھانچے کی پیروی کرتا ہے:
+
+```python
+import rclpy
+from rclpy.node import Node
+
+class MyNode(Node):
+    def __init__(self):
+        super().__init__('node_name')
+        # پبلشرز، سبسکرائبرز، ٹائمرز وغیرہ کو شروع کریں۔
+    
+    def callback_function(self):
+        # ایونٹس کو سنبھالیں (ٹائمر، پیغامات وغیرہ)
+        pass
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = MyNode()
+    rclpy.spin(node)  # نوڈ کو چلتے رہیں
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+**اہم اجزاء:**
+1.  **rclpy درآمد کریں**: ROS 2 Python لائبریری
+2.  **نوڈ کلاس بنائیں**: `rclpy.node.Node` سے ورثہ میں ملتا ہے
+3.  **نوڈ شروع کریں**: کنسٹرکٹر میں `super().__init__('node_name')` کو کال کریں
+4.  **کمیونیکیشن سیٹ اپ کریں**: `__init__` میں پبلشرز، سبسکرائبرز، ٹائمرز بنائیں
+5.  **اسپن نوڈ**: `rclpy.spin(node)` لوپ میں کال بیکس پر کارروائی کرتا ہے
+6.  **شٹ ڈاؤن**: نوڈ ختم ہونے پر وسائل کو صاف کریں
+
+---
+
+## پبلشر نوڈ: کمانڈز بھیجنا
+
+آئیے ایک **ویلاسٹی کمانڈر** بنائیں جو روبوٹ کو آگے بڑھنے کے لیے کہے:
+
+### مکمل کوڈ: `velocity_publisher.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Velocity Publisher Node
+روبوٹ کے پہیوں کو کنٹرول کرنے کے لیے نقل و حرکت کے احکامات شائع کرتا ہے۔
+"""
+
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import Twist
+
+class VelocityPublisher(Node):
+    """
+    نوڈ جو 10 Hz پر رفتار کی کمانڈز شائع کرتا ہے۔
+    Topic: /cmd_vel (geometry_msgs/Twist)
+    """
+    
+    def __init__(self):
+        super().__init__('velocity_publisher')
+        
+        # /cmd_vel ٹوپک پر پبلشر بنائیں
+        self.publisher_ = self.create_publisher(
+            Twist,           # پیغام کی قسم
+            '/cmd_vel',      # ٹوپک کا نام
+            10               # قطار کا سائز (اگر سبسکرائبر سست ہو تو آخری 10 پیغامات رکھیں)
+        )
+        
+        # ٹائمر بنائیں جو ہر 0.1 سیکنڈ (10 Hz) میں publish_velocity() کو کال کرے
+        self.timer = self.create_timer(0.1, self.publish_velocity)
+        
+        # رفتار کمانڈ کو شروع کریں
+        self.cmd = Twist()
+        self.cmd.linear.x = 0.5   # 0.5 m/s پر آگے بڑھیں
+        self.cmd.angular.z = 0.2  # 0.2 rad/s پر گھمائیں (ہلکا بائیں موڑ)
+        
+        self.get_logger().info('Velocity Publisher started - Commanding robot to move')
+    
+    def publish_velocity(self):
+        """ٹائمر کے ذریعہ کال کیا جانے والا کال بیک فنکشن"""
+        self.publisher_.publish(self.cmd)
+        self.get_logger().info(f'Publishing: linear.x={self.cmd.linear.x}, angular.z={self.cmd.angular.z}')
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = VelocityPublisher()
+    
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+### کوڈ بریک ڈاؤن
+
+**لائنز 20-24: پبلشر بنائیں**
+```python
+self.publisher_ = self.create_publisher(Twist, '/cmd_vel', 10)
+```
+*   `Twist`: پیغام کی قسم (لکیری اور کونیی رفتار پر مشتمل ہے)
+*   `/cmd_vel`: روبوٹ کی رفتار کے احکامات کے لیے معیاری ROS 2 ٹوپک کا نام
+*   `10`: قطار کا سائز (اگر نیٹ ورک سست ہے تو بفرز پیغامات)
+
+**لائنز 26-27: ٹائمر بنائیں**
+```python
+self.timer = self.create_timer(0.1, self.publish_velocity)
+```
+*   ہر 0.1 سیکنڈ میں `publish_velocity()` کو کال کرتا ہے (10 Hz فریکوئنسی)
+*   ٹائمر متواتر کاموں کو انجام دینے کا ROS 2 کا پسندیدہ طریقہ ہے۔
+
+**لائنز 29-32: پیغام شروع کریں**
+```python
+self.cmd = Twist()
+self.cmd.linear.x = 0.5   # آگے کی رفتار
+self.cmd.angular.z = 0.2  # گردشی رفتار
+```
+*   `Twist` میں دو 3D ویکٹر ہیں: `linear` (m/s) اور `angular` (rad/s)
+*   پہیے والے روبوٹ کے لیے، عام طور پر صرف `linear.x` اور `angular.z` استعمال ہوتے ہیں۔
+
+**لائنز 37-39: پیغام شائع کریں**
+```python
+self.publisher_.publish(self.cmd)
+```
+*   `/cmd_vel` ٹوپک پر پیغام بھیجتا ہے۔
+*   تمام سبسکرائبر اسے DDS مڈل ویئر کے ذریعے فوری طور پر وصول کرتے ہیں۔
+
+---
+
+## سبسکرائبر نوڈ: سینسر ڈیٹا وصول کرنا
+
+اب ایک ایسا نوڈ بناتے ہیں جو ٹوپک پر پیغامات کو **سنتا ہے**:
+
+### مکمل کوڈ: `sensor_listener.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Sensor Listener Node
+سینسر ڈیٹا کو سبسکرائب کرتا ہے اور اسے لاگ کرتا ہے۔
+"""
+
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import String
+
+class SensorListener(Node):
+    """
+    نوڈ جو /sensor_data ٹوپک کو سبسکرائب کرتا ہے۔
+    Topic: /sensor_data (std_msgs/String)
+    """
+    
+    def __init__(self):
+        super().__init__('sensor_listener')
+        
+        # سبسکرائبر بنائیں
+        self.subscription = self.create_subscription(
+            String,                    # پیغام کی قسم
+            '/sensor_data',            # ٹوپک کا نام
+            self.listener_callback,    # کال بیک فنکشن
+            10                         # قطار کا سائز
+        )
+        
+        self.get_logger().info('Sensor Listener started - Waiting for data...')
+    
+    def listener_callback(self, msg):
+        """
+        جب بھی /sensor_data پر کوئی پیغام آتا ہے خود بخود کال کیا جاتا ہے۔
+        
+        Args:
+            msg (std_msgs/String): موصول ہونے والا پیغام
+        """
+        self.get_logger().info(f'Received: "{msg.data}"')
+        
+        # مثال: سینسر ڈیٹا پارس کریں اور کارروائی کریں۔
+        if "warning" in msg.data.lower():
+            self.get_logger().warn('⚠️  SENSOR ALERT DETECTED!')
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = SensorListener()
+    
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+### پبلشر سے اہم فرق
+
+**1. سبسکرائبر کی تخلیق (Lines 21-26)**
+```python
+self.subscription = self.create_subscription(
+    String,
+    '/sensor_data',
+    self.listener_callback,  # ← کال بیک فنکشن
+    10
+)
+```
+*   آپ ایک **کال بیک فنکشن** فراہم کرتے ہیں جسے ROS 2 پیغامات آنے پر کال کرتا ہے۔
+*   کسی ٹائمر کی ضرورت نہیں — کال بیکس ایونٹ پر مبنی ہوتے ہیں۔
+
+**2. کال بیک فنکشن (Lines 30-41)**
+```python
+def listener_callback(self, msg):
+    self.get_logger().info(f'Received: "{msg.data}"')
+```
+*   `msg` پیرامیٹر میں موصولہ ڈیٹا ہوتا ہے۔
+*   جب بھی کوئی پیغام آتا ہے یہ فنکشن **غیر ہم آہنگ (asynchronously)** چلتا ہے۔
+
+:::tip بہترین پریکٹس
+کال بیکس کو **تیز** رکھیں — یہاں بھاری گنتی نہ کریں۔ اگر پروسیسنگ میں 1ms سے زیادہ وقت لگتا ہے، تو ایک الگ دھاگہ استعمال کریں یا بعد میں پروسیسنگ کے لیے ڈیٹا کو قطار میں رکھیں۔
+:::
+
+---
+
+## اپنے نوڈس کو چلانا
+
+### مرحلہ 1: اسکرپٹس کو قابل عمل بنائیں
+
+```bash
+chmod +x velocity_publisher.py
+chmod +x sensor_listener.py
+```
+
+### مرحلہ 2: پبلشر کو چلائیں (ٹرمینل 1)
+
+```bash
+python3 velocity_publisher.py
+```
+
+**متوقع آؤٹ پٹ:**
+```
+[INFO] [velocity_publisher]: Velocity Publisher started - Commanding robot to move
+[INFO] [velocity_publisher]: Publishing: linear.x=0.5, angular.z=0.2
+[INFO] [velocity_publisher]: Publishing: linear.x=0.5, angular.z=0.2
+```
+
+### مرحلہ 3: ٹوپک کی تصدیق کریں (ٹرمینل 2)
+
+```bash
+ros2 topic echo /cmd_vel
+```
+
+**متوقع آؤٹ پٹ:**
+```
+linear:
+  x: 0.5
+  y: 0.0
+  z: 0.0
+angular:
+  x: 0.0
+  y: 0.0
+  z: 0.2
+---
+```
+
+---
+
+## ROS 2 پیکیج کا ڈھانچہ
+
+ROS 2 ورک اسپیس میں نوڈز کو ضم کرنے کے لیے، آپ کو دو اہم فائلوں کی ضرورت ہے:
+
+### 1. `package.xml` - پیکیج میٹا ڈیٹا
+
+```xml
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>my_robot_controller</name>
+  <version>0.1.0</version>
+  <description>Python nodes for robot control</description>
+  <maintainer email="you@example.com">Your Name</maintainer>
+  <license>Apache-2.0</license>
+
+  <!-- ٹول کا انحصار بنائیں -->
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <!-- رن ٹائم انحصار -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
+```
+
+**اہم عناصر:**
+*   `<name>`: پیکیج کا نام (`ros2 run <package_name> <node_name>` میں استعمال ہوتا ہے)
+*   `<buildtool_depend>`: سسٹم بنائیں (Python پیکجز کے لیے ament_python)
+*   `<exec_depend>`: رن ٹائم انحصار (rclpy, پیغام کی اقسام)
+
+---
+
+### 2. `setup.py` - پائیتھون پیکیج کنفیگریشن
+
+```python
+from setuptools import setup
+
+package_name = 'my_robot_controller'
+
+setup(
+    name=package_name,
+    version='0.1.0',
+    packages=[package_name],
+    data_files=[
+        ('share/ament_index/resource_index/packages',
+            ['resource/' + package_name]),
+        ('share/' + package_name, ['package.xml']),
+    ],
+    install_requires=['setuptools'],
+    zip_safe=True,
+    maintainer='Your Name',
+    maintainer_email='you@example.com',
+    description='Python nodes for robot control',
+    license='Apache-2.0',
+    tests_require=['pytest'],
+    entry_points={
+        'console_scripts': [
+            'velocity_publisher = my_robot_controller.velocity_publisher:main',
+            'sensor_listener = my_robot_controller.sensor_listener:main',
+        ],
+    },
+)
+```
+
+**اہم سیکشن: `entry_points`**
+```python
+'velocity_publisher = my_robot_controller.velocity_publisher:main'
+```
+*   **بائیں طرف**: کمانڈ کا نام (آپ `ros2 run <package>` کے بعد کیا لکھتے ہیں)
+*   **دائیں طرف**: Python ماڈیول کا راستہ اور فنکشن کال کرنے کے لیے
+
+یہ آپ کو چلانے کی اجازت دیتا ہے:
+```bash
+ros2 run my_robot_controller velocity_publisher
+```
+
+---
+
+## ڈائریکٹری کا ڈھانچہ (Directory Structure)
+
+ایک مکمل ROS 2 Python پیکیج اس طرح لگتا ہے:
+
+```
+my_robot_controller/
+├── my_robot_controller/          # Python ماڈیول
+│   ├── __init__.py               # خالی فائل (پائتھون پیکیج کے بطور نشان زد)
+│   ├── velocity_publisher.py     # پبلشر نوڈ
+│   └── sensor_listener.py        # سبسکرائبر نوڈ
+├── resource/
+│   └── my_robot_controller       # خالی مارکر فائل
+├── test/
+│   ├── test_copyright.py
+│   └── test_flake8.py
+├── package.xml                   # ROS 2 پیکیج میٹا ڈیٹا
+└── setup.py                      # Python پیکیج کنفیگریشن
+```
+
+### بنانا اور چلانا
+
+```bash
+# آپ کے ROS 2 ورک اسپیس روٹ سے
+cd ~/ros2_ws
+
+# پیکیج بنائیں
+colcon build --packages-select my_robot_controller
+
+# ورک اسپیس کا ماخذ
+source install/setup.bash
+
+# نوڈز چلائیں
+ros2 run my_robot_controller velocity_publisher
+ros2 run my_robot_controller sensor_listener
+```
+
+---
+
+## ہینڈ آن ورزش: درجہ حرارت مانیٹر
+
+**چیلنج:** دو نوڈ سسٹم بنائیں:
+1.  **پبلشر**: درجہ حرارت کے سینسر کی نقل کرتا ہے، ہر سیکنڈ میں بے ترتیب اقدار (15-30°C) شائع کرتا ہے۔
+2.  **سبسکرائبر**: درجہ حرارت کو لاگ کرتا ہے اور اگر درجہ حرارت > 25°C ہو تو انتباہ دیتا ہے۔
+
+### سٹارٹر کوڈ: درجہ حرارت پبلشر
+
+```python
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import Float32
+import random
+
+class TemperatureSensor(Node):
+    def __init__(self):
+        super().__init__('temperature_sensor')
+        self.publisher_ = self.create_publisher(Float32, '/temperature', 10)
+        self.timer = self.create_timer(1.0, self.publish_temperature)
+        
+    def publish_temperature(self):
+        msg = Float32()
+        msg.data = random.uniform(15.0, 30.0)  # سینسر پڑھنے کی نقالی کریں۔
+        self.publisher_.publish(msg)
+        self.get_logger().info(f'Publishing temperature: {msg.data:.2f}°C')
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = TemperatureSensor()
+    rclpy.spin(node)
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+**آپ کا کام:** سبسکرائبر نوڈ لکھیں جو:
+*   `/temperature` کو سبسکرائب کرتا ہے۔
+*   ہر پڑھنے کو لاگ کرتا ہے۔
+*   اگر درجہ حرارت 25 ڈگری سینٹی گریڈ سے زیادہ ہو تو انتباہ پرنٹ کرتا ہے۔
+
+---
+
+## کلیدی ٹیکا ویز (Key Takeaways)
+
+✅ **rclpy** ROS 2 کے لیے Python کلائنٹ لائبریری ہے۔
+✅ **نوڈز** Python کلاسز ہیں جو `rclpy.node.Node` سے وارث ہوتی ہیں۔
+✅ **پبلشرز** `create_publisher()` اور ٹائمرز کے ساتھ پیغامات بھیجتے ہیں۔
+✅ **سبسکرائبرز** `create_subscription()` اور کال بیکس کے ساتھ پیغامات وصول کرتے ہیں۔
+✅ **package.xml** ROS 2 انحصار کی وضاحت کرتا ہے۔
+✅ **setup.py** Python پیکیج کے ڈھانچے اور داخلی مقامات کی وضاحت کرتا ہے۔
+
+---
+
+## اگلا کیا ہے؟
+
+آپ نے Python نوڈز لکھنا سیکھ لیا ہے جو عنوانات کو شائع اور سبسکرائب کرتے ہیں۔ اگلا باب **URDF (یونیفائیڈ روبوٹ ڈسکرپشن فارمیٹ)** متعارف کرایا ہے — روبوٹ باڈیز کی وضاحت کے لیے XML زبان، جسے ROS 2 تصور، نقالی اور کنٹرول کے لیے استعمال کرتا ہے۔
+
+---
+
+## مزید پڑھنا
+
+*   [rclpy API Documentation](https://docs.ros2.org/latest/api/rclpy/index.html)
+*   [Writing a Simple Publisher/Subscriber (Python)](https://docs.ros.org/en/humble/Tutorials/Beginner-Client-Libraries/Writing-A-Simple-Py-Publisher-And-Subscriber.html)
+*   [Creating a ROS 2 Package](https://docs.ros.org/en/humble/Tutorials/Beginner-Client-Libraries/Creating-Your-First-ROS2-Package.html)
+*   [Python Best Practices for ROS 2](https://docs.ros.org/en/humble/The-ROS2-Project/Contributing/Code-Style-Language-Versions.html)

@@ -12,5 +12,5 @@ venv/
 __pycache__/
 
 # Heavy logic not needed for runtime API
-docs/
-static/
+# docs/ (Required for build)
+# static/ (Required for build)

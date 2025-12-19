@@ -1,0 +1,644 @@
+---
+sidebar_position: 3
+title: "سافٹ ویئر کی ضروریات"
+description: "ضروری سافٹ ویئر سیٹ اپ: Docker، VS Code، Python، اور فزیکل AI کے لیے ڈویلپمنٹ ٹولز"
+keywords: [Docker, VS Code, Python, ROS 2, development environment, Ubuntu setup]
+---
+
+# سافٹ ویئر کی ضروریات (Software Prerequisites)
+
+## جائزہ (Overview)
+
+آپ کے Ubuntu 22.04 ورک اسٹیشن کے تیار ہونے کے ساتھ، اب ڈویلپمنٹ کے ماحول کو کنفیگر کرنے کا وقت آگیا ہے۔ یہ باب آپ کو فزیکل AI ڈویلپمنٹ کے لیے ضروری سافٹ ویئر اسٹیک کو انسٹال اور کنفیگر کرنے میں رہنمائی کرے گا۔
+
+**ہم کیا انسٹال کریں گے:**
+1.  **Docker** – ROS 2 اور Isaac Sim کے لیے کنٹینرائزڈ ماحول
+2.  **VS Code** – روبوٹکس ایکسٹینشنز کے ساتھ بنیادی کوڈ ایڈیٹر
+3.  **Python 3.10+** – روبوٹ کنٹرول کے لیے پروگرامنگ زبان
+4.  **Git** – آپ کے کوڈ کے لیے ورژن کنٹرول
+5.  **ضروری ٹولز** – Curl, wget, build tools
+
+**تخمینی وقت:** 45 منٹ
+
+---
+
+## Docker کیوں؟
+
+### وہ مسئلہ جو Docker حل کرتا ہے
+
+ROS 2 اور روبوٹکس لائبریریوں میں **پیچیدہ انحصاری زنجیریں (dependency chains)** ہوتی ہیں:
+
+```
+ROS 2 Humble requires:
+├── Python 3.10
+├── Cyclone DDS
+├── Gazebo 11
+├── TF2 (Transform Library)
+├── OpenCV 4.5+
+├── ... (50+ packages)
+```
+
+انہیں دستی طور پر انسٹال کرنا:
+*   3-4 گھنٹے لیتا ہے
+*   اکثر ٹوٹ جاتا ہے (ورژن تنازعات)
+*   آپ کے سسٹم کو گلوبل پیکیجز سے آلودہ کرتا ہے
+
+### Docker کا حل
+
+**Docker کنٹینرز** الگ تھلگ ماحول ہیں جن میں شامل ہیں:
+*   تمام انحصارات پہلے سے انسٹال ہیں (pre-installed)
+*   مخصوص ورژنز لاک ہیں (کوئی تنازعہ نہیں)
+*   تمام مشینوں پر قابل تولید (Reproducible)
+
+**مشابہت:** Docker کو "سٹیرائڈز پر ورچوئل ماحول" کے طور پر سوچیں جس میں نہ صرف پائتھون پیکجز، بلکہ پورا آپریٹنگ سسٹم، لائبریریاں اور کنفیگریشن شامل ہیں۔
+
+---
+
+## Docker انسٹال کرنا
+
+### مرحلہ 1: پرانے ورژنز کو ہٹائیں (اگر کوئی ہیں)
+
+```bash
+# متضاد پیکجز کو ہٹائیں
+sudo apt remove docker docker-engine docker.io containerd runc
+```
+
+### مرحلہ 2: آفیشل ریپوزٹری سے Docker انسٹال کریں
+
+```bash
+# پیکیج انڈیکس کو اپ ڈیٹ کریں
+sudo apt update
+
+# ضروری شرائط انسٹال کریں
+sudo apt install -y \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release
+
+# Docker کی آفیشل GPG کی (key) شامل کریں
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+    sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+# Docker ریپوزٹری سیٹ اپ کریں
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Docker انجن انسٹال کریں
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+```
+
+### مرحلہ 3: Docker کی اجازتیں کنفیگر کریں
+
+پہلے سے طے شدہ طور پر، Docker کو `sudo` کی ضرورت ہوتی ہے۔ آئیے اسے ٹھیک کریں:
+
+```bash
+# اپنے صارف کو ڈوکر گروپ میں شامل کریں
+sudo usermod -aG docker $USER
+
+# گروپ کی تبدیلیوں کا اطلاق کریں (لاگ آؤٹ/لاگ ان کریں یا اسے چلائیں)
+newgrp docker
+
+# تصدیق کریں (sudo کے بغیر کام کرنا چاہیے)
+docker run hello-world
+```
+
+**متوقع آؤٹ پٹ:**
+```
+Hello from Docker!
+This message shows that your installation appears to be working correctly.
+```
+
+:::info Snap کیوں استعمال نہیں کرتے؟
+Ubuntu اسنیپ (`snap install docker`) کے ذریعے Docker پیش کرتا ہے، لیکن اس میں NVIDIA کنٹینرز کے لیے GPU پاس تھرو کے ساتھ **معلوم مسائل** ہیں۔ ہمیشہ آفیشل Docker ریپوزٹری استعمال کریں۔
+:::
+
+### مرحلہ 4: NVIDIA کنٹینر ٹول کٹ انسٹال کریں
+
+یہ Docker کنٹینرز کو آپ کے GPU تک رسائی کی اجازت دیتا ہے:
+
+```bash
+# NVIDIA کنٹینر ٹول کٹ ریپوزٹری شامل کریں
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
+curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
+    sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+
+# NVIDIA Docker رن ٹائم انسٹال کریں
+sudo apt update
+sudo apt install -y nvidia-container-toolkit
+
+# Docker کو دوبارہ شروع کریں
+sudo systemctl restart docker
+```
+
+### مرحلہ 5: Docker میں GPU رسائی کی تصدیق کریں
+
+```bash
+# GPU رسائی کے ساتھ ٹیسٹ کنٹینر چلائیں
+docker run --rm --gpus all nvidia/cuda:12.0.0-base-ubuntu22.04 nvidia-smi
+```
+
+**متوقع آؤٹ پٹ:**
+```
++-----------------------------------------------------------------------------+
+| NVIDIA-SMI 535.54.03    Driver Version: 535.54.03    CUDA Version: 12.0   |
+|-------------------------------+----------------------+----------------------+
+| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|===============================+======================+======================|
+|   0  NVIDIA GeForce ...  Off  | 00000000:01:00.0  On |                  N/A |
+|  0%   45C    P0    30W / 285W |   1024MiB / 12288MiB |      0%      Default |
++-------------------------------+----------------------+----------------------+
+```
+
+:::tip GPU رسائی کی ٹربل شوٹنگ
+اگر آپ "could not select device driver" دیکھتے ہیں، تو یقینی بنائیں کہ:
+1.  NVIDIA ڈرائیور انسٹال ہیں (`nvidia-smi` Docker کے باہر کام کرتا ہے)
+2.  آپ نے nvidia-container-toolkit انسٹال کرنے کے بعد `sudo systemctl restart docker` چلایا
+3.  آپ docker run کمانڈ میں `--gpus all` فلیگ استعمال کر رہے ہیں
+:::
+
+---
+
+## Visual Studio Code انسٹال کرنا
+
+### مرحلہ 1: ڈاؤن لوڈ اور انسٹال کریں
+
+**طریقہ 1: Snap کے ذریعے (سب سے آسان)**
+
+```bash
+sudo snap install --classic code
+```
+
+**طریقہ 2: .deb پیکیج کے ذریعے (تجویز کردہ)**
+
+```bash
+# .deb پیکیج ڈاؤن لوڈ کریں
+wget -O code.deb 'https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64'
+
+# انسٹال کریں
+sudo apt install ./code.deb
+
+# صفائی کریں
+rm code.deb
+```
+
+### مرحلہ 2: VS Code لانچ کریں
+
+```bash
+code
+```
+
+### مرحلہ 3: ضروری ایکسٹینشنز انسٹال کریں
+
+ایکسٹینشن پینل (`Ctrl+Shift+X`) کھولیں اور انسٹال کریں:
+
+1.  **Python** (Microsoft)
+    *   سنٹیکس ہائی لائٹنگ، انٹیلی سینس، ڈیبگنگ
+2.  **Pylance** (Microsoft)
+    *   تیز رفتار پائتھون لینگویج سرور
+3.  **Docker** (Microsoft)
+    *   VS Code سے کنٹینرز کا نظم کریں
+4.  **ROS** (Microsoft)
+    *   ROS 2 سنٹیکس، ڈیبگنگ، ویژوالائزیشن
+5.  **C/C++** (Microsoft)
+    *   ROS 2 پیکجز کو مرتب کرنے کے لیے ضروری ہے۔
+6.  **CMake Tools** (Microsoft)
+    *   بلڈ سسٹم انٹیگریشن
+7.  **XML** (Red Hat)
+    *   URDF روبوٹ کی تفصیل والی فائلوں کے لیے
+8.  **YAML** (Red Hat)
+    *   ROS 2 لانچ فائلوں اور کنفیگریشن کے لیے
+
+**CLI کے ذریعے فوری انسٹال:**
+
+```bash
+code --install-extension ms-python.python
+code --install-extension ms-python.vscode-pylance
+code --install-extension ms-azuretools.vscode-docker
+code --install-extension ms-iot.vscode-ros
+code --install-extension ms-vscode.cpptools
+code --install-extension ms-vscode.cmake-tools
+code --install-extension redhat.vscode-xml
+code --install-extension redhat.vscode-yaml
+```
+
+### مرحلہ 4: Python انٹرپریٹر کنفیگر کریں
+
+1.  کمانڈ پیلیٹ (`Ctrl+Shift+P`) کھولیں
+2.  "Python: Select Interpreter" ٹائپ کریں
+3.  `/usr/bin/python3` (سسٹم Python 3.10) منتخب کریں
+
+---
+
+## Python سیٹ اپ
+
+### Python ورژن کی تصدیق کریں
+
+Ubuntu 22.04 پائتھون 3.10 کے ساتھ آتا ہے:
+
+```bash
+python3 --version
+# متوقع: Python 3.10.12 یا نیا
+```
+
+### pip (پیکیج مینیجر) انسٹال کریں
+
+```bash
+# Python 3 کے لیے pip انسٹال کریں
+sudo apt install python3-pip
+
+# تصدیق کریں
+pip3 --version
+# متوقع: pip 22.0.2 یا نیا
+```
+
+### ڈویلپمنٹ ٹولز انسٹال کریں
+
+```bash
+# Python ڈویلپمنٹ ہیڈرز انسٹال کریں (C ایکسٹینشنز مرتب کرنے کے لیے ضروری)
+sudo apt install python3-dev
+
+# virtualenv انسٹال کریں (الگ تھلگ ماحول کے لیے)
+pip3 install virtualenv
+```
+
+### ورچوئل ماحول بنائیں (اختیاری لیکن تجویز کردہ)
+
+غیر ڈوکر پروجیکٹس کے لیے، انحصار (dependencies) کو الگ کرنے کے لیے ورچوئل ماحول استعمال کریں:
+
+```bash
+# ایک ورچوئل ماحول بنائیں
+python3 -m venv ~/ros2_venv
+
+# اسے ایکٹیویٹ کریں
+source ~/ros2_venv/bin/activate
+
+# آپ کا پرامپٹ اب دکھائے گا (ros2_venv)
+
+# اس الگ تھلگ ماحول میں پیکجز انسٹال کریں
+pip install numpy scipy matplotlib
+
+# کام مکمل ہونے پر غیر فعال کریں
+deactivate
+```
+
+:::info Docker بمقابلہ ورچوئل ماحول
+*   **Docker:** ROS 2, Gazebo, Isaac Sim (سسٹم لیول انحصار) کے لیے استعمال کریں
+*   **venv:** خالص پائتھون پروجیکٹس (ڈیٹا تجزیہ، ML ٹریننگ) کے لیے استعمال کریں
+:::
+
+---
+
+## Git ورژن کنٹرول
+
+### Git انسٹال کریں
+
+```bash
+# Git انسٹال کریں
+sudo apt install git
+
+# تصدیق کریں
+git --version
+# متوقع: git version 2.34.1 یا نیا
+```
+
+### Git کنفیگر کریں
+
+```bash
+# اپنا نام اور ای میل سیٹ کریں (کمٹ میں استعمال ہوتا ہے)
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+
+# پہلے سے طے شدہ برانچ کا نام 'main' مقرر کریں
+git config --global init.defaultBranch main
+
+# کلرڈ آؤٹ پٹ کو فعال کریں
+git config --global color.ui auto
+
+# پہلے سے طے شدہ ایڈیٹر کو VS Code مقرر کریں
+git config --global core.editor "code --wait"
+```
+
+### کنفیگریشن کی تصدیق کریں
+
+```bash
+git config --list
+```
+
+---
+
+## ضروری کمانڈ لائن ٹولز
+
+### بلڈ ٹولز انسٹال کریں
+
+```bash
+# GCC, Make, اور دیگر کمپائلیشن ٹولز
+sudo apt install build-essential
+
+# CMake (ROS 2 پیکجز بنانے کے لیے ضروری)
+sudo apt install cmake
+
+# تصدیق کریں
+gcc --version    # gcc (Ubuntu 11.x) دکھانا چاہیے
+make --version   # GNU Make 4.3 دکھانا چاہیے
+cmake --version  # cmake 3.22+ دکھانا چاہیے
+```
+
+### نیٹ ورک ٹولز انسٹال کریں
+
+```bash
+# wget (URL سے فائلیں ڈاؤن لوڈ کریں)
+sudo apt install wget
+
+# curl (URLs کے ساتھ ڈیٹا منتقل کریں، بہت سے اسکرپٹس میں استعمال ہوتا ہے)
+sudo apt install curl
+
+# net-tools (ifconfig, netstat)
+sudo apt install net-tools
+```
+
+### پروڈکٹیوٹی ٹولز انسٹال کریں
+
+```bash
+# htop (سسٹم مانیٹر)
+sudo apt install htop
+
+# tree (ڈائریکٹری ڈھانچے کا تصور کریں)
+sudo apt install tree
+
+# tmux (متعدد سیشنز کے انتظام کے لیے ٹرمینل ملٹی پلیکسر)
+sudo apt install tmux
+```
+
+---
+
+## Docker Compose سیٹ اپ
+
+Docker Compose آپ کو YAML فائلوں میں ملٹی کنٹینر ایپلی کیشنز کی وضاحت کرنے دیتا ہے۔
+
+### Docker Compose پلگ ان انسٹال کریں
+
+(اگر آپ نے اوپر Docker انسٹال کرنے کے مراحل پر عمل کیا ہے تو پہلے ہی انسٹال ہے)
+
+```bash
+# تنصیب کی تصدیق کریں
+docker compose version
+# متوقع: Docker Compose version v2.20.0 یا نیا
+```
+
+### مثال: ملٹی کنٹینر ROS 2 سیٹ اپ
+
+ایک `docker-compose.yml` بنائیں:
+
+```yaml
+version: '3.8'
+
+services:
+  ros2-master:
+    image: ros:humble
+    container_name: ros2_master
+    network_mode: host
+    environment:
+      - ROS_DOMAIN_ID=42
+    command: ros2 run demo_nodes_cpp talker
+
+  ros2-listener:
+    image: ros:humble
+    container_name: ros2_listener
+    network_mode: host
+    environment:
+      - ROS_DOMAIN_ID=42
+    command: ros2 run demo_nodes_cpp listener
+```
+
+**اسے چلائیں:**
+
+```bash
+docker compose up
+```
+
+**متوقع آؤٹ پٹ:**
+```
+ros2_master     | [INFO] Publishing: 'Hello World: 1'
+ros2_listener   | [INFO] I heard: [Hello World: 1]
+```
+
+---
+
+## تصدیقی چیک لسٹ (Verification Checklist)
+
+ROS 2 کی تنصیب کے لیے آگے بڑھنے سے پہلے، تصدیق کریں:
+
+```bash
+# 1. Docker sudo کے بغیر کام کرتا ہے
+docker ps
+# متوقع: خالی فہرست (کوئی غلطی نہیں)
+
+# 2. Docker کے پاس GPU رسائی ہے
+docker run --rm --gpus all nvidia/cuda:12.0.0-base-ubuntu22.04 nvidia-smi
+# متوقع: GPU معلومات ظاہر ہوں
+
+# 3. VS Code انسٹال ہے
+code --version
+# متوقع: ورژن نمبر
+
+# 4. Python 3.10+ دستیاب ہے
+python3 --version
+# متوقع: Python 3.10.x
+
+# 5. Git کنفیگر ہے
+git config user.name
+# متوقع: آپ کا نام
+
+# 6. بلڈ ٹولز دستیاب ہیں
+gcc --version && cmake --version
+# متوقع: دونوں کے لیے ورژن نمبر
+```
+
+:::success چیک پوائنٹ پاس ہو گیا
+اگر اوپر دی گئی تمام کمانڈز کام کرتی ہیں، تو آپ ROS 2 Humble انسٹال کرنے کے لیے تیار ہیں! 🎉
+:::
+
+---
+
+## عام مسائل اور حل
+
+### مسئلہ: Docker کی اجازت مسترد (Permission Denied)
+
+**الاوی:**
+```bash
+docker: Got permission denied while trying to connect to the Docker daemon socket
+```
+
+**حل:**
+```bash
+# اپنے آپ کو ڈوکر گروپ میں شامل کریں
+sudo usermod -aG docker $USER
+
+# لاگ آؤٹ اور دوبارہ لاگ ان کریں، یا چلائیں:
+newgrp docker
+```
+
+---
+
+### مسئلہ: NVIDIA-SMI Docker میں نہیں ملا
+
+**الاوی:**
+```bash
+docker run --rm --gpus all nvidia/cuda:12.0.0-base-ubuntu22.04 nvidia-smi
+# Error: nvidia-smi: command not found
+```
+
+**حل:**
+```bash
+# NVIDIA کنٹینر ٹول کٹ دوبارہ انسٹال کریں
+sudo apt purge nvidia-container-toolkit
+sudo apt install nvidia-container-toolkit
+
+# Docker کو دوبارہ شروع کریں
+sudo systemctl restart docker
+```
+
+---
+
+### مسئلہ: VS Code ایکسٹینشنز کام نہیں کر رہی ہیں
+
+**الاوی:**
+Python ایکسٹینشن خودکار تکمیل یا لنٹنگ فراہم نہیں کرتی ہے۔
+
+**حل:**
+```bash
+# یقینی بنائیں کہ Python ایکسٹینشن انسٹال ہے
+code --install-extension ms-python.python
+
+# یقینی بنائیں کہ Pylance انسٹال ہے
+code --install-extension ms-python.vscode-pylance
+
+# VS Code ونڈو کو دوبارہ لوڈ کریں
+# Ctrl+Shift+P → "Developer: Reload Window"
+```
+
+---
+
+### مسئلہ: Git Push ہر بار صارف نام/پاس ورڈ کا تقاضا کرتا ہے
+
+**الاوی:**
+GitHub ہر پش پر اسناد مانگتا ہے۔
+
+**حل (SSH Keys استعمال کریں):**
+
+```bash
+# SSH کی (key) بنائیں
+ssh-keygen -t ed25519 -C "your.email@example.com"
+
+# ڈیفالٹ لوکیشن کو قبول کرنے کے لیے Enter دبائیں
+# ایک پاس فریز سیٹ کریں (یا کوئی نہیں کے لیے Enter دبائیں)
+
+# پبلک کی (key) کو کلپ بورڈ پر کاپی کریں
+cat ~/.ssh/id_ed25519.pub
+
+# اس کلید کو GitHub میں شامل کریں:
+# 1. github.com → Settings → SSH and GPG keys پر جائیں
+# 2. "New SSH key" پر کلک کریں
+# 3. اپنی پبلک کی (key) پیسٹ کریں
+# 4. محفوظ کریں
+
+# کنکشن ٹیسٹ کریں
+ssh -T git@github.com
+# Expected: "Hi [username]! You've successfully authenticated..."
+```
+
+---
+
+## ڈیولپمنٹ ورک فلو کی مثال
+
+یہاں ایک عام ترقیاتی سیشن ہے:
+
+```bash
+# 1. Docker کنٹینرز شروع کریں
+cd ~/physical_ai_project
+docker compose up -d
+
+# 2. VS Code کھولیں
+code .
+
+# 3. VS Code کو چلتے ہوئے کنٹینر کے ساتھ منسلک کریں
+# ("Dev Containers" ایکسٹینشن استعمال کریں)
+
+# 4. کوڈ لکھیں، کنٹینر میں ٹیسٹ کریں
+
+# 5. تبدیلیاں کمٹ کریں
+git add .
+git commit -m "Implemented robot navigation"
+git push
+
+# 6. ہو جانے پر کنٹینرز بند کریں
+docker compose down
+```
+
+---
+
+## اگلے مراحل
+
+آپ کے ڈویلپمنٹ ماحول کے کنفیگر ہونے کے ساتھ، آپ ان کے لیے تیار ہیں:
+
+1.  **ROS 2 Humble انسٹال کریں** (ماڈیول 1، باب 1)
+2.  **Gazebo Simulator سیٹ اپ کریں** (ماڈیول 2، باب 1)
+3.  **Isaac Sim انسٹال کریں** (ماڈیول 3، باب 1)
+
+بنیاد رکھ دی گئی ہے۔ اب روبوٹس بنانے کا وقت ہے! 🤖
+
+---
+
+**اگلا ماڈیول:** [ROS 2 کے بنیادی اصول →](../02-Module-1-ROS2/01-nodes-topics.mdx)
+
+---
+
+:::tip پیداواری صلاحیت کے لیے کی بورڈ شارٹ کٹس
+
+**VS Code:**
+*   `Ctrl+Shift+P` – کمانڈ پیلیٹ
+*   `Ctrl+`` – ٹرمینل ٹوگل کریں
+*   `Ctrl+B` – سائیڈ بار ٹوگل کریں
+*   `Ctrl+Shift+F` – تمام فائلوں میں تلاش کریں
+
+**ٹرمینل (Bash):**
+*   `Ctrl+R` – کمانڈ ہسٹری تلاش کریں
+*   `Ctrl+A` – لائن کے شروع میں جائیں
+*   `Ctrl+E` – لائن کے آخر میں جائیں
+*   `Ctrl+L` – اسکرین صاف کریں
+:::
+
+:::info وسائل کا انتظام (Resource Management)
+متعدد ڈوکر کنٹینرز + Isaac Sim چلانا اہم وسائل استعمال کر سکتا ہے۔ CPU/RAM/GPU کے استعمال کی نگرانی کے لیے `htop` کا استعمال کریں۔ اگر سسٹم سست ہو جائے تو غیر ضروری ایپلی کیشنز بند کریں یا سیمولیشن کی پیچیدگی کو کم کریں۔
+:::
+
+## اضافی وسائل
+
+### سرکاری دستاویزات
+*   [Docker Docs](https://docs.docker.com/)
+*   [VS Code Docs](https://code.visualstudio.com/docs)
+*   [ROS 2 Humble Docs](https://docs.ros.org/en/humble/)
+
+### ٹیوٹوریلز
+*   [Docker for Beginners](https://docker-curriculum.com/)
+*   [Git Handbook](https://guides.github.com/introduction/git-handbook/)
+*   [Python Virtual Environments](https://realpython.com/python-virtual-environments-a-primer/)
+
+### کمیونٹی
+*   [ROS Discourse](https://discourse.ros.org/)
+*   [Docker Community Forums](https://forums.docker.com/)
+*   [Physical AI Discord](#) (کورس کے مواد میں لنک)
+
+---
+
+**ماحول کا سیٹ اپ مکمل!** ✅
+
+اب آپ کے پاس فزیکل AI ڈویلپمنٹ کے لیے تیار مکمل طور پر کنفیگر شدہ Ubuntu 22.04 ورک اسٹیشن ہے۔ اگلے ماڈیول میں، ہم ROS 2 میں غوطہ لگائیں گے اور روبوٹس کو کنٹرول کرنا شروع کریں گے۔
